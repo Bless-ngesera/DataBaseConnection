@@ -4,4 +4,5 @@ import javax.swing.*;
 
 
 public class BookPanel extends JPanel {
+    private JTextField textField1;
 }

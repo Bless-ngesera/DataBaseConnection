@@ -25,7 +25,7 @@
         </constraints>
         <properties>
           <font name="JetBrains Mono ExtraBold" size="48" style="1"/>
-          <text value="Register"/>
+          <text value="Log In"/>
         </properties>
       </component>
       <component id="9b0fd" class="javax.swing.JLabel">
