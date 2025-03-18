@@ -1,14 +1,14 @@
-package core.model;
+package Lib_GUI;
 
 public class Book {
-    private int id;
+    private int bookId;
     private String title;
     private String author;
     private String genre;
     private boolean available;
 
-    public int getId() { return id; }
-    public void setId(int id) { this.id = id; }
+    public int getId() { return bookId; }
+    public void setId(int id) { this.bookId = id; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getAuthor() { return author; }
