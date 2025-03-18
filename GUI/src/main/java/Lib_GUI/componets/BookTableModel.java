@@ -1,6 +1,8 @@
 package Lib_GUI.componets;
 
-import Library.model.Book;
+
+import core.model.Book;
+
 import javax.swing.table.AbstractTableModel;
 import java.util.List;
 
@@ -17,20 +19,20 @@ public class BookTableModel extends AbstractTableModel {
         return books.get(row);
     }
 
-    @Override public int getRowCount() { return books != null ? books.size() : 0; }
+    @Override public int getRowCount() { return books.size(); }
     @Override public int getColumnCount() { return COLUMNS.length; }
-    @Override public String getColumnName(int col) { return COLUMNS[col]; }
+    @Override public String getColumnName(int column) { return COLUMNS[column]; }
 
     @Override
-    public Object getValueAt(int row, int col) {
+    public Object getValueAt(int row, int column) {
         Book book = books.get(row);
-        return switch (col) {
-            case 0 -> book.getId();
-            case 1 -> book.getTitle();
-            case 2 -> book.getAuthor();
-            case 3 -> book.getGenre();
-            case 4 -> book.isAvailable() ? "Yes" : "No";
-            default -> null;
-        };
+        switch (column) {
+            case 0: return book.getId();
+            case 1: return book.getTitle();
+            case 2: return book.getAuthor();
+            case 3: return book.getGenre();
+            case 4: return book.isAvailable() ? "Yes" : "No";
+            default: return null;
+        }
     }
 }
