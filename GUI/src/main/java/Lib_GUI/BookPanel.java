@@ -1,29 +1,24 @@
 package Lib_GUI;
 
-//import Lib_GUI.componets.BookTableModel;
-//import core.DAO.BookDAO;
-//import core.model.Book;
-
 import javax.swing.*;
+import javax.swing.table.AbstractTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-//import java.sql.Connection;
-//import java.sql.SQLException;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class BookPanel {
     private JTextField titleField;
-    private JTextField authorField2;
+    private JTextField authorField;
     private JTextField genreField;
     private JTextField SearchField;
     private JTable table;
     private JButton deleteButton;
     private JButton addButton;
     private JButton cancelButton;
+    private JButton searchButton;
     private JPanel BookPanel;
     private JLabel Search;
     private JLabel Title;
@@ -31,195 +26,232 @@ public class BookPanel {
     private JLabel Genre;
     private JLabel title;
     private JLabel logo;
-    public Book book;
+    private JRadioButton yesRadioButton;
+    private JRadioButton noRadioButton;
+    private BookTableModel tableModel;
 
-    public BookPanel(JFrame parent){
+    public BookPanel(JFrame parent) {
         JDialog dialog = new JDialog(parent, "Book Management", true);
         dialog.setContentPane(BookPanel);
         dialog.setMinimumSize(new Dimension(900, 600));
         dialog.setModal(true);
         dialog.setLocationRelativeTo(parent);
-        dialog.setVisible(true);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+
+        // Group the radio buttons
+        ButtonGroup availabilityGroup = new ButtonGroup();
+        availabilityGroup.add(yesRadioButton);
+        availabilityGroup.add(noRadioButton);
+        yesRadioButton.setSelected(true); // Default selection
+
+        tableModel = new BookTableModel();
+        table.setModel(tableModel);
+
+        loadBooks();
+
         addButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 addBook();
             }
         });
+
+        deleteButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                deleteBook();
+            }
+        });
+
+        searchButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                searchBooks();
+            }
+        });
+
         cancelButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 dialog.dispose();
             }
         });
+
         dialog.setVisible(true);
     }
 
+    private void loadBooks() {
+        List<Book> books = fetchBooksFromDB();
+        tableModel.setBooks(books);
+    }
+
     private void addBook() {
-        JDialog dialog = new JDialog();
         String title = titleField.getText();
-        String author = authorField2.getText();
+        String author = authorField.getText();
         String genre = genreField.getText();
-        String search = SearchField.getText();
-        if (title.isEmpty() || author.isEmpty() || genre.isEmpty() || search.isEmpty()) {
-            JOptionPane.showMessageDialog(BookPanel, "Please fill all fields",
-                    "try again", JOptionPane.ERROR_MESSAGE);
+        boolean availability = yesRadioButton.isSelected(); // Get availability from radio button
+
+        if (title.isEmpty() || author.isEmpty() || genre.isEmpty()) {
+            JOptionPane.showMessageDialog(BookPanel, "Please fill all fields", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        book=addUserToDB(title, author, genre);
+        Book book = addBookToDB(title, author, genre, availability);
 
         if (book != null) {
-            dialog.dispose();
+            JOptionPane.showMessageDialog(BookPanel, "Book added successfully: " + book.getTitle(), "Success", JOptionPane.INFORMATION_MESSAGE);
+            clearFields();
+            loadBooks();
         } else {
-            JOptionPane.showMessageDialog(BookPanel, "Failed to add book",
-                    "Try again", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(BookPanel, "Failed to add book", "Error", JOptionPane.ERROR_MESSAGE);
         }
-
     }
 
-    private Book addUserToDB(String title, String author, String genre) {
-        Book book= null;
+    private void deleteBook() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(BookPanel, "Please select a book to delete", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        int bookId = tableModel.getBookAt(selectedRow).getbookId();
+        boolean deleted = deleteBookFromDB(bookId);
+
+        if (deleted) {
+            JOptionPane.showMessageDialog(BookPanel, "Book deleted successfully", "Success", JOptionPane.INFORMATION_MESSAGE);
+            loadBooks();
+        } else {
+            JOptionPane.showMessageDialog(BookPanel, "Failed to delete book", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void searchBooks() {
+        String searchTerm = SearchField.getText().trim();
+        if (searchTerm.isEmpty()) {
+            loadBooks();
+            return;
+        }
+
+        List<Book> books = searchBooksInDB(searchTerm);
+        tableModel.setBooks(books);
+    }
+
+    private Book addBookToDB(String title, String author, String genre, boolean availability) {
+        Book book = null;
         final String DB_URL = "jdbc:mysql://localhost:3306/library_db?serverTimezone=UTC";
         final String USERNAME = "root";
         final String PASSWORD = "2006";
 
-        try {
-            Connection connection = DriverManager.getConnection(DB_URL, USERNAME, PASSWORD);
+        try (Connection connection = DriverManager.getConnection(DB_URL, USERNAME, PASSWORD)) {
             String sql = "INSERT INTO books (title, author, genre, availability) VALUES (?, ?, ?, ?)";
-            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            try (PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
                 stmt.setString(1, title);
                 stmt.setString(2, author);
                 stmt.setString(3, genre);
-                stmt.setBoolean(4, true);
-                stmt.executeUpdate();
+                stmt.setBoolean(4, availability);
+
+                int addedRows = stmt.executeUpdate();
+                if (addedRows > 0) {
+                    ResultSet rs = stmt.getGeneratedKeys();
+                    if (rs.next()) {
+                        book = new Book();
+                        book.setbookId(rs.getInt(1));
+                        book.setTitle(title);
+                        book.setAuthor(author);
+                        book.setGenre(genre);
+                        book.setAvailable(availability);
+                    }
+                }
             }
-            // book = new Book(title, author, genre, true);
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(BookPanel, "Error: " + e.getMessage());
+            e.printStackTrace();
         }
 
         return book;
     }
 
-    public static void main(String[] args) {
-        new BookPanel(new JFrame());
+    private boolean deleteBookFromDB(int bookId) {
+        final String DB_URL = "jdbc:mysql://localhost:3306/library_db?serverTimezone=UTC";
+        final String USERNAME = "root";
+        final String PASSWORD = "2006";
+
+        try (Connection connection = DriverManager.getConnection(DB_URL, USERNAME, PASSWORD)) {
+            String sql = "DELETE FROM books WHERE bookId = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+                stmt.setInt(1, bookId);
+                int deletedRows = stmt.executeUpdate();
+                return deletedRows > 0;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return false;
     }
 
+    private List<Book> fetchBooksFromDB() {
+        List<Book> books = new ArrayList<>();
+        final String DB_URL = "jdbc:mysql://localhost:3306/library_db?serverTimezone=UTC";
+        final String USERNAME = "root";
+        final String PASSWORD = "2006";
 
+        try (Connection connection = DriverManager.getConnection(DB_URL, USERNAME, PASSWORD)) {
+            String sql = "SELECT * FROM books";
+            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+                ResultSet rs = stmt.executeQuery();
+                while (rs.next()) {
+                    Book book = new Book();
+                    book.setbookId(rs.getInt("bookId"));
+                    book.setTitle(rs.getString("title"));
+                    book.setAuthor(rs.getString("author"));
+                    book.setGenre(rs.getString("genre"));
+                    book.setAvailable(rs.getBoolean("availability"));
+                    books.add(book);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
 
-//    public BookPanel(Connection connection) {
-//        this.bookDAO = new BookDAO(connection);
-//        initializeComponents();
-//        setupLayout();
-//        setupListeners();
-//        loadData();
-//    }
-//
-//    private void initializeComponents() {
-//        BookPanel = new JPanel(new BorderLayout());
-//        titleField = new JTextField(20);
-//        authorField2 = new JTextField(20);
-//        genreField = new JTextField(20);
-//        SearchField = new JTextField(20);
-//        table = new JTable(new BookTableModel());
-//        deleteButton = new JButton("Delete");
-//        addButton = new JButton("Add");
-//        cancelButton = new JButton("Cancel");
-//        Search = new JLabel("Search:");
-//        Title = new JLabel("Title:");
-//        Author = new JLabel("Author:");
-//        Genre = new JLabel("Genre:");
-//        title = new JLabel("Book Management");
-//        logo = new JLabel(new ImageIcon("logo.png"));
-//    }
-//
-//    private void setupLayout() {
-//        BookPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-//        JPanel header = new JPanel(new BorderLayout());
-//        header.add(logo, BorderLayout.WEST);
-//        header.add(title, BorderLayout.CENTER);
-//        JPanel searchPanel = new JPanel(new BorderLayout());
-//        searchPanel.add(Search, BorderLayout.WEST);
-//        searchPanel.add(SearchField, BorderLayout.CENTER);
-//        JPanel inputPanel = new JPanel(new GridLayout(3, 2, 5, 5));
-//        inputPanel.add(Title);
-//        inputPanel.add(titleField);
-//        inputPanel.add(Author);
-//        inputPanel.add(authorField2);
-//        inputPanel.add(Genre);
-//        inputPanel.add(genreField);
-//        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-//        buttonPanel.add(addButton);
-//        buttonPanel.add(deleteButton);
-//        buttonPanel.add(cancelButton);
-//        BookPanel.add(header, BorderLayout.NORTH);
-//        BookPanel.add(searchPanel, BorderLayout.PAGE_START);
-//        BookPanel.add(new JScrollPane(table), BorderLayout.CENTER);
-//        BookPanel.add(inputPanel, BorderLayout.SOUTH);
-//        BookPanel.add(buttonPanel, BorderLayout.PAGE_END);
-//    }
-//
-//    private void setupListeners() {
-//        addButton.addActionListener(e -> addBook());
-//        deleteButton.addActionListener(e -> deleteBook());
-//        cancelButton.addActionListener(e -> clearFields());
-//        SearchField.addActionListener(e -> searchBooks());
-//    }
-//
-//    private void loadData() {
-//        try {
-//            ((BookTableModel) table.getModel()).setBooks(bookDAO.readAll());
-//        } catch (SQLException e) {
-//            JOptionPane.showMessageDialog(BookPanel, "Error: " + e.getMessage());
-//        }
-//    }
-//
-//    private void addBook() {
-//        try {
-//            Book book = new Book();
-//            book.setTitle(titleField.getText());
-//            book.setAuthor(authorField2.getText());
-//            book.setGenre(genreField.getText());
-//            book.setAvailable(true);
-//            bookDAO.create(book);
-//            clearFields();
-//            loadData();
-//        } catch (SQLException e) {
-//            JOptionPane.showMessageDialog(BookPanel, "Add error: " + e.getMessage());
-//        }
-//    }
-//
-//    private void deleteBook() {
-//        int row = table.getSelectedRow();
-//        if (row >= 0) {
-//            try {
-//                Book book = ((BookTableModel) table.getModel()).getBookAt(row);
-//                bookDAO.delete(book.getId());
-//                loadData();
-//            } catch (SQLException e) {
-//                JOptionPane.showMessageDialog(BookPanel, "Delete error: " + e.getMessage());
-//            }
-//        }
-//    }
-//
-//    private void searchBooks() {
-//        try {
-//            ((BookTableModel) table.getModel()).setBooks(bookDAO.search(SearchField.getText()));
-//        } catch (SQLException e) {
-//            JOptionPane.showMessageDialog(BookPanel, "Search error: " + e.getMessage());
-//        }
-//    }
-//
-//    private void clearFields() {
-//        titleField.setText("");
-//        authorField2.setText("");
-//        genreField.setText("");
-//        SearchField.setText("");
-//        table.clearSelection();
-//    }
-//
-//    public JPanel getBookPanel() {
-//        return BookPanel;
-//    }
+        return books;
+    }
+
+    private List<Book> searchBooksInDB(String searchTerm) {
+        List<Book> books = new ArrayList<>();
+        final String DB_URL = "jdbc:mysql://localhost:3306/library_db?serverTimezone=UTC";
+        final String USERNAME = "root";
+        final String PASSWORD = "2006";
+
+        try (Connection connection = DriverManager.getConnection(DB_URL, USERNAME, PASSWORD)) {
+            String sql = "SELECT * FROM books WHERE title LIKE ? OR author LIKE ? OR genre LIKE ?";
+            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+                stmt.setString(1, "%" + searchTerm + "%");
+                stmt.setString(2, "%" + searchTerm + "%");
+                stmt.setString(3, "%" + searchTerm + "%");
+
+                ResultSet rs = stmt.executeQuery();
+                while (rs.next()) {
+                    Book book = new Book();
+                    book.setbookId(rs.getInt("bookId"));
+                    book.setTitle(rs.getString("title"));
+                    book.setAuthor(rs.getString("author"));
+                    book.setGenre(rs.getString("genre"));
+                    book.setAvailable(rs.getBoolean("availability"));
+                    books.add(book);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return books;
+    }
+
+    private void clearFields() {
+        titleField.setText("");
+        authorField.setText("");
+        genreField.setText("");
+        yesRadioButton.setSelected(true); // Reset radio button to default
+    }
+
 }

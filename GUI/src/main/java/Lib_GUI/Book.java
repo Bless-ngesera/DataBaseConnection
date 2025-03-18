@@ -7,8 +7,8 @@ public class Book {
     private String genre;
     private boolean available;
 
-    public int getId() { return bookId; }
-    public void setId(int id) { this.bookId = id; }
+    public int getbookId() { return bookId; }
+    public void setbookId(int id) { this.bookId = id; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getAuthor() { return author; }
