@@ -1,7 +1,7 @@
-module GUI {
+module GUI{
     exports Lib_GUI;
-    exports Lib_GUI.GUI;
+    exports Lib_GUI.componets;
     requires java.desktop;
-//    requires Library.Core;
     requires java.sql;
+    requires Library_Core;
 }
