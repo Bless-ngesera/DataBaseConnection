@@ -1,7 +1,6 @@
 package Lib_GUI;
 
 import javax.swing.*;
-import javax.swing.table.AbstractTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -251,7 +250,7 @@ public class BookPanel {
         titleField.setText("");
         authorField.setText("");
         genreField.setText("");
-        yesRadioButton.setSelected(true); // Reset radio button to default
+        yesRadioButton.setSelected(true);
     }
 
 }
