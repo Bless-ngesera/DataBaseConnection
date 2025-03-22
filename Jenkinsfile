@@ -6,7 +6,7 @@ pipeline {
     }
 
     environment {
-        POM_PATH = 'pom.xml' // Path to the parent POM file
+        POM_PATH = 'Task8/pom.xml' // Path to the parent POM file
         SONAR_HOST_URL = 'http://your-sonarqube-server:9000' // Replace with your SonarQube URL
         SONAR_LOGIN = credentials('sonar-token-id') // Use Jenkins credentials ID for SonarQube authentication
     }
